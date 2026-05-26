@@ -405,6 +405,11 @@ FodyWeavers.xsd
 **/*.rs.bk
 Cargo.lock.bak
 
+# This file inherited a Visual Studio template that ignores [Bb]in/.
+# Our Rust binaries live in src/bin/ — explicitly un-ignore that path.
+!src/bin/
+!src/bin/**
+
 # sonic-graph generated artifacts
 /out/
 *.spectrogram.png

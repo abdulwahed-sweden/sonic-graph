@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>sonic-graph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    font: 15px/1.5 system-ui, sans-serif;
+    max-width: 720px;
+    margin: 3rem auto;
+    padding: 0 1.25rem;
+    color: #222;
+  }
+  h1 { font-size: 1.4rem; font-weight: 600; margin: 0 0 1.5rem 0; }
+  form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  input[type=file] { flex: 1 1 240px; min-width: 0; }
+  select, button { padding: 0.45rem 0.7rem; font: inherit; }
+  button { cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: wait; }
+  #status { margin: 1rem 0 0 0; color: #666; min-height: 1.2em; font-size: 0.9rem; }
+  #status.err { color: #c00; }
+  img { max-width: 100%; display: block; margin-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>sonic-graph</h1>
+
+<form id="f">
+  <input id="wav" type="file" name="wav" accept=".wav,audio/wav,audio/x-wav" required>
+  <select id="colormap" name="colormap">
+    <option value="luxe">luxe</option>
+    <option value="magma">magma</option>
+    <option value="inferno">inferno</option>
+    <option value="viridis">viridis</option>
+    <option value="mono">mono</option>
+  </select>
+  <button id="go" type="submit">render</button>
+</form>
+
+<p id="status"></p>
+<div id="out"></div>
+
+<script>
+const f = document.getElementById('f');
+const go = document.getElementById('go');
+const status = document.getElementById('status');
+const out = document.getElementById('out');
+let blobUrl = null;
+
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData();
+  fd.append('wav', document.getElementById('wav').files[0]);
+  fd.append('colormap', document.getElementById('colormap').value);
+  fd.append('title', '');
+  fd.append('fft_size', '2048');
+  fd.append('hop_size', '512');
+  fd.append('db_floor', '-90');
+  fd.append('db_ceiling', '0');
+  fd.append('max_freq', '');
+  fd.append('width', '3840');
+  fd.append('height', '2160');
+
+  go.disabled = true;
+  status.className = '';
+  status.textContent = 'rendering…';
+  if (blobUrl) URL.revokeObjectURL(blobUrl);
+  out.innerHTML = '';
+
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/render', { method: 'POST', body: fd });
+    if (!r.ok) {
+      status.className = 'err';
+      status.textContent = (await r.text()).split('\n')[0];
+      return;
+    }
+    const blob = await r.blob();
+    blobUrl = URL.createObjectURL(blob);
+    status.textContent = `${((performance.now() - t0)).toFixed(0)} ms · ${(blob.size/1024).toFixed(0)} KB`;
+    const img = document.createElement('img');
+    img.src = blobUrl;
+    out.appendChild(img);
+  } catch (err) {
+    status.className = 'err';
+    status.textContent = err.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
