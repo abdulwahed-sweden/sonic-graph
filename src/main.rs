@@ -34,11 +34,11 @@ struct Cli {
     hop_size: usize,
 
     /// Lower dB clip used for color mapping
-    #[arg(long, default_value_t = -90.0)]
+    #[arg(long, default_value_t = -90.0, allow_hyphen_values = true)]
     db_floor: f32,
 
     /// Upper dB clip used for color mapping
-    #[arg(long, default_value_t = 0.0)]
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     db_ceiling: f32,
 
     /// Maximum frequency to display (Hz). Defaults to the Nyquist frequency.
