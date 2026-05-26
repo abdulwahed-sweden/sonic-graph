@@ -1,0 +1,29 @@
+[package]
+name = "sonic-graph"
+version = "0.1.0"
+edition = "2021"
+authors = ["Abdulwahed Mansour <abdulwahed.sweden@gmail.com>"]
+description = "Blazing-fast CLI for generating luxurious 4K bioacoustics spectrograms"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/abdulwahed-sweden/sonic-graph"
+keywords = ["spectrogram", "audio", "bioacoustics", "fft", "stft"]
+categories = ["command-line-utilities", "multimedia::audio"]
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+hound = "3.5"
+plotters = "0.3"
+rayon = "1.10"
+rustfft = "6.2"
+
+[dev-dependencies]
+approx = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
+overflow-checks = false

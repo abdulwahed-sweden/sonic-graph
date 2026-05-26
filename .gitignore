@@ -399,3 +399,13 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Rust / Cargo
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# sonic-graph generated artifacts
+/out/
+*.spectrogram.png
+
