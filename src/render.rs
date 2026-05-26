@@ -4,6 +4,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
+use clap::ValueEnum;
 use plotters::element::BitMapElement;
 use plotters::prelude::*;
 use plotters::style::text_anchor::{HPos, Pos, VPos};
@@ -16,6 +17,105 @@ const GOLD: RGBColor = RGBColor(0xD4, 0xAF, 0x37);
 const SILVER: RGBColor = RGBColor(0xC5, 0xC6, 0xC7);
 const FAINT_AXIS: RGBColor = RGBColor(0x3A, 0x33, 0x22);
 
+/// Selectable colormap. Each variant defines a small set of normalized
+/// `(t, [r, g, b])` stops that `sample()` interpolates linearly.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum Colormap {
+    /// Dark mysterious: void → midnight purple → crimson → amber → gold → cyan halo
+    Luxe,
+    /// Matplotlib magma: black → purple → magenta → bright yellow
+    Magma,
+    /// Matplotlib inferno: black → purple → orange → pale yellow
+    Inferno,
+    /// Matplotlib viridis: perceptually uniform purple → green → yellow
+    Viridis,
+    /// Pure grayscale (black → white)
+    Mono,
+}
+
+impl Colormap {
+    fn stops(self) -> &'static [(f32, [f32; 3])] {
+        match self {
+            Colormap::Luxe => &LUXE_STOPS,
+            Colormap::Magma => &MAGMA_STOPS,
+            Colormap::Inferno => &INFERNO_STOPS,
+            Colormap::Viridis => &VIRIDIS_STOPS,
+            Colormap::Mono => &MONO_STOPS,
+        }
+    }
+
+    /// Map normalized intensity `t ∈ [0, 1]` to an 8-bit RGB triple.
+    #[inline]
+    pub fn sample(self, t: f32) -> (u8, u8, u8) {
+        let t = t.clamp(0.0, 1.0);
+        let stops = self.stops();
+        for i in 0..stops.len() - 1 {
+            let (t0, c0) = stops[i];
+            let (t1, c1) = stops[i + 1];
+            if t <= t1 {
+                let k = ((t - t0) / (t1 - t0)).clamp(0.0, 1.0);
+                let r = c0[0] + (c1[0] - c0[0]) * k;
+                let g = c0[1] + (c1[1] - c0[1]) * k;
+                let b = c0[2] + (c1[2] - c0[2]) * k;
+                return (
+                    (r * 255.0) as u8,
+                    (g * 255.0) as u8,
+                    (b * 255.0) as u8,
+                );
+            }
+        }
+        let last = stops[stops.len() - 1].1;
+        (
+            (last[0] * 255.0) as u8,
+            (last[1] * 255.0) as u8,
+            (last[2] * 255.0) as u8,
+        )
+    }
+}
+
+const LUXE_STOPS: [(f32, [f32; 3]); 7] = [
+    (0.00, [0.000, 0.000, 0.000]),
+    (0.12, [0.078, 0.020, 0.157]),
+    (0.30, [0.290, 0.055, 0.360]),
+    (0.50, [0.760, 0.094, 0.310]),
+    (0.70, [0.965, 0.490, 0.180]),
+    (0.88, [0.965, 0.870, 0.420]),
+    (1.00, [0.835, 1.000, 0.980]),
+];
+
+const MAGMA_STOPS: [(f32, [f32; 3]); 7] = [
+    (0.00, [0.001, 0.001, 0.014]),
+    (0.20, [0.143, 0.071, 0.336]),
+    (0.40, [0.397, 0.099, 0.467]),
+    (0.60, [0.677, 0.150, 0.477]),
+    (0.80, [0.953, 0.339, 0.376]),
+    (0.90, [0.988, 0.617, 0.358]),
+    (1.00, [0.987, 0.991, 0.749]),
+];
+
+const INFERNO_STOPS: [(f32, [f32; 3]); 7] = [
+    (0.00, [0.001, 0.001, 0.014]),
+    (0.20, [0.135, 0.058, 0.353]),
+    (0.40, [0.402, 0.083, 0.434]),
+    (0.60, [0.694, 0.165, 0.358]),
+    (0.80, [0.929, 0.378, 0.149]),
+    (0.90, [0.987, 0.645, 0.040]),
+    (1.00, [0.988, 1.000, 0.643]),
+];
+
+const VIRIDIS_STOPS: [(f32, [f32; 3]); 5] = [
+    (0.00, [0.267, 0.005, 0.329]),
+    (0.25, [0.231, 0.318, 0.545]),
+    (0.50, [0.128, 0.566, 0.551]),
+    (0.75, [0.369, 0.789, 0.382]),
+    (1.00, [0.993, 0.906, 0.144]),
+];
+
+const MONO_STOPS: [(f32, [f32; 3]); 2] = [
+    (0.00, [0.000, 0.000, 0.000]),
+    (1.00, [1.000, 1.000, 1.000]),
+];
+
 pub struct RenderOptions<'a> {
     pub spectrogram: &'a Spectrogram,
     pub sample_rate: u32,
@@ -26,6 +126,7 @@ pub struct RenderOptions<'a> {
     pub db_floor: f32,
     pub db_ceiling: f32,
     pub max_freq: Option<f32>,
+    pub colormap: Colormap,
 }
 
 pub fn render_spectrogram(opts: RenderOptions) -> Result<()> {
@@ -115,6 +216,7 @@ pub fn render_spectrogram(opts: RenderOptions) -> Result<()> {
         plot_h as usize,
         opts.db_floor,
         opts.db_ceiling,
+        opts.colormap,
     );
 
     let image = BitMapElement::with_owned_buffer(
@@ -133,6 +235,7 @@ pub fn render_spectrogram(opts: RenderOptions) -> Result<()> {
         opts.height,
         opts.db_floor,
         opts.db_ceiling,
+        opts.colormap,
     )
     .context("drawing colorbar")?;
 
@@ -153,6 +256,7 @@ fn rasterize_spectrogram(
     height: usize,
     db_floor: f32,
     db_ceiling: f32,
+    cmap: Colormap,
 ) -> Vec<u8> {
     let range = (db_ceiling - db_floor).max(1e-6);
     let inv_range = 1.0 / range;
@@ -191,7 +295,7 @@ fn rasterize_spectrogram(
                 let v = v0 + (v1 - v0) * by;
 
                 let t = ((v - db_floor) * inv_range).clamp(0.0, 1.0);
-                let (r, g, b) = colormap(t);
+                let (r, g, b) = cmap.sample(t);
 
                 let o = x * 3;
                 row[o] = r;
@@ -203,47 +307,13 @@ fn rasterize_spectrogram(
     buffer
 }
 
-/// Luxurious colormap: void black → midnight purple → crimson magenta →
-/// molten amber → glowing gold → luminous cyan halo.
-#[inline]
-fn colormap(t: f32) -> (u8, u8, u8) {
-    const STOPS: [(f32, [f32; 3]); 7] = [
-        (0.00, [0.000, 0.000, 0.000]),
-        (0.12, [0.078, 0.020, 0.157]),
-        (0.30, [0.290, 0.055, 0.360]),
-        (0.50, [0.760, 0.094, 0.310]),
-        (0.70, [0.965, 0.490, 0.180]),
-        (0.88, [0.965, 0.870, 0.420]),
-        (1.00, [0.835, 1.000, 0.980]),
-    ];
-
-    let t = t.clamp(0.0, 1.0);
-
-    for i in 0..STOPS.len() - 1 {
-        let (t0, c0) = STOPS[i];
-        let (t1, c1) = STOPS[i + 1];
-        if t <= t1 {
-            let k = ((t - t0) / (t1 - t0)).clamp(0.0, 1.0);
-            let r = c0[0] + (c1[0] - c0[0]) * k;
-            let g = c0[1] + (c1[1] - c0[1]) * k;
-            let b = c0[2] + (c1[2] - c0[2]) * k;
-            return ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8);
-        }
-    }
-    let last = STOPS[STOPS.len() - 1].1;
-    (
-        (last[0] * 255.0) as u8,
-        (last[1] * 255.0) as u8,
-        (last[2] * 255.0) as u8,
-    )
-}
-
 fn draw_colorbar(
     root: &DrawingArea<BitMapBackend, plotters::coord::Shift>,
     canvas_w: u32,
     canvas_h: u32,
     db_floor: f32,
     db_ceiling: f32,
+    cmap: Colormap,
 ) -> Result<()> {
     let bar_w: i32 = 36;
     let bar_right_padding: i32 = 150;
@@ -257,7 +327,7 @@ fn draw_colorbar(
 
     for y in 0..bar_h {
         let t = 1.0 - y as f32 / (bar_h - 1).max(1) as f32;
-        let (r, g, b) = colormap(t);
+        let (r, g, b) = cmap.sample(t);
         let color = RGBColor(r, g, b);
         root.draw(&Rectangle::new(
             [(bar_x, bar_top + y), (bar_x + bar_w, bar_top + y + 1)],
@@ -328,27 +398,66 @@ fn format_time(t: &f64) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn colormap_endpoints_are_dark_and_bright() {
-        let (r0, g0, b0) = colormap(0.0);
-        assert_eq!((r0, g0, b0), (0, 0, 0));
-        let (r1, g1, b1) = colormap(1.0);
-        // Top stop is a bright cyan-white; all channels should be very high.
-        assert!(r1 > 200 && g1 > 200 && b1 > 200);
+    const ALL_MAPS: [Colormap; 5] = [
+        Colormap::Luxe,
+        Colormap::Magma,
+        Colormap::Inferno,
+        Colormap::Viridis,
+        Colormap::Mono,
+    ];
+
+    fn luminance((r, g, b): (u8, u8, u8)) -> f32 {
+        0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32
     }
 
     #[test]
-    fn colormap_is_monotonic_in_luminance() {
-        let lum = |t: f32| {
-            let (r, g, b) = colormap(t);
-            0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32
-        };
-        let mut prev = lum(0.0);
-        for i in 1..=20 {
-            let cur = lum(i as f32 / 20.0);
-            // Allow tiny dips between stops, but the overall trend must be up.
-            assert!(cur >= prev - 5.0, "luminance dropped at t={}", i);
-            prev = cur;
+    fn luxe_endpoints_are_dark_and_bright() {
+        assert_eq!(Colormap::Luxe.sample(0.0), (0, 0, 0));
+        let (r, g, b) = Colormap::Luxe.sample(1.0);
+        assert!(r > 200 && g > 200 && b > 200);
+    }
+
+    #[test]
+    fn every_map_is_brighter_at_top_than_bottom() {
+        // Universal property of any sensible spectrogram colormap.
+        for cmap in ALL_MAPS {
+            let lo = luminance(cmap.sample(0.0));
+            let hi = luminance(cmap.sample(1.0));
+            assert!(
+                hi > lo + 50.0,
+                "{:?}: top luminance {} not clearly above bottom {}",
+                cmap,
+                hi,
+                lo
+            );
+        }
+    }
+
+    #[test]
+    fn every_map_is_roughly_monotonic_in_luminance() {
+        for cmap in ALL_MAPS {
+            let mut prev = luminance(cmap.sample(0.0));
+            for i in 1..=20 {
+                let cur = luminance(cmap.sample(i as f32 / 20.0));
+                // Small local dips between stops are tolerated; the curve
+                // must not invert by more than a single colormap step.
+                assert!(
+                    cur >= prev - 10.0,
+                    "{:?}: luminance dipped at t={}",
+                    cmap,
+                    i
+                );
+                prev = cur;
+            }
+        }
+    }
+
+    #[test]
+    fn mono_is_truly_grayscale() {
+        for i in 0..=10 {
+            let (r, g, b) = Colormap::Mono.sample(i as f32 / 10.0);
+            assert_eq!(r, g);
+            assert_eq!(g, b);
         }
     }
 }

@@ -56,6 +56,10 @@ struct Cli {
     /// Override the displayed title (defaults to the input file's stem)
     #[arg(long)]
     title: Option<String>,
+
+    /// Colormap used to paint the spectrogram
+    #[arg(long, value_enum, default_value_t = render::Colormap::Luxe)]
+    colormap: render::Colormap,
 }
 
 fn main() -> Result<()> {
@@ -113,6 +117,7 @@ fn main() -> Result<()> {
         db_floor: cli.db_floor,
         db_ceiling: cli.db_ceiling,
         max_freq: cli.max_freq,
+        colormap: cli.colormap,
     })
     .with_context(|| format!("failed to render `{}`", cli.output.display()))?;
     eprintln!("             render done ({:?})", t2.elapsed());
