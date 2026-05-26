@@ -1,14 +1,11 @@
 //! sonic-graph — generate luxurious 4K spectrograms from WAV audio.
 
-mod audio;
-mod math;
-mod render;
-
 use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use sonic_graph::{audio, math, render};
 
 #[derive(Parser, Debug)]
 #[command(

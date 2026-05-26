@@ -409,3 +409,6 @@ Cargo.lock.bak
 /out/
 *.spectrogram.png
 
+# Sample audio at the project root — convenient for testing, not source
+*.wav
+

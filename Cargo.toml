@@ -16,10 +16,20 @@ clap = { version = "4.5", features = ["derive"] }
 hound = "3.5"
 plotters = "0.3"
 rayon = "1.10"
+rouille = "3.6"
 rustfft = "6.2"
+tempfile = "3"
 
 [dev-dependencies]
 approx = "0.5"
+
+[[bin]]
+name = "sonic-graph"
+path = "src/main.rs"
+
+[[bin]]
+name = "sonic-graph-web"
+path = "src/bin/web.rs"
 
 [profile.release]
 opt-level = 3
